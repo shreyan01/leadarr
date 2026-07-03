@@ -1,0 +1,64 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-canvas text-ink font-body antialiased;
+  }
+
+  h1, h2, h3, h4 {
+    @apply font-display;
+  }
+
+  /* Visible keyboard focus everywhere — never suppressed. */
+  :focus-visible {
+    outline: 2px solid theme("colors.brass.DEFAULT");
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  ::selection {
+    background-color: theme("colors.brass.dim");
+    color: theme("colors.ink");
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-surface border border-border rounded-card shadow-card;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-md bg-brass px-4 py-2
+           text-sm font-medium text-canvas transition-colors hover:bg-brass-bright
+           disabled:opacity-50 disabled:pointer-events-none;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-md border border-border
+           bg-surface-raised px-4 py-2 text-sm font-medium text-ink transition-colors
+           hover:border-brass-dim disabled:opacity-50 disabled:pointer-events-none;
+  }
+
+  .input {
+    @apply w-full rounded-md border border-border bg-surface-raised px-3 py-2 text-sm text-ink
+           placeholder:text-ink-faint focus:border-brass focus:outline-none;
+  }
+
+  .label {
+    @apply text-xs font-medium uppercase tracking-wide text-ink-muted;
+  }
+}

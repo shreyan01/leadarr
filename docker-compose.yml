@@ -1,0 +1,103 @@
+version: "3.9"
+
+x-backend-env: &backend-env
+  env_file: .env
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: leadforge
+      POSTGRES_PASSWORD: leadforge
+      POSTGRES_DB: leadforge
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U leadforge"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Local Qwen2.5-VL server, OpenAI-compatible /v1/chat/completions with image
+  # input. Model weights are pulled from Hugging Face into `qwen_model_cache`
+  # on first start (nothing is sent to a hosted vision API). Requires an
+  # NVIDIA GPU + the NVIDIA Container Toolkit on the host.
+  qwen-vl:
+    image: vllm/vllm-openai:latest
+    command:
+      - --model=Qwen/Qwen2.5-VL-7B-Instruct
+      - --served-model-name=qwen2.5-vl-7b
+      - --port=8001
+      - --max-model-len=8192
+    ports:
+      - "8001:8001"
+    volumes:
+      - qwen_model_cache:/root/.cache/huggingface
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    # No GPU on this machine? Swap the image/command above for Ollama instead:
+    #   image: ollama/ollama:latest
+    #   command: ["serve"]
+    # then `docker compose exec qwen-vl ollama pull qwen2.5vl:7b` and set
+    # QWEN_VL_BASE_URL=http://qwen-vl:11434 in .env.
+
+  backend:
+    build: ./backend
+    <<: *backend-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - backend_storage:/app/storage
+    ports:
+      - "8000:8000"
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  worker:
+    build: ./backend
+    <<: *backend-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - backend_storage:/app/storage
+    command: celery -A app.workers.celery_app worker --loglevel=info -Q discovery,crawl,audit,reporting,outreach
+
+  frontend:
+    build: ./frontend
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:8000/api/v1
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    command: npm run dev
+
+volumes:
+  postgres_data:
+  qwen_model_cache:
+  backend_storage:

@@ -1,0 +1,63 @@
+version: "3.9"
+
+# Production overrides. Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# This file removes dev conveniences (bind mounts, --reload, exposed DB/Redis
+# ports) and adds: gunicorn with multiple uvicorn workers, a built (not
+# dev-server) frontend, restart policies, and an nginx reverse proxy that
+# terminates TLS. See README.md "Self-hosting" for certificate setup.
+
+services:
+  postgres:
+    ports: []  # not exposed to the host in production
+    restart: unless-stopped
+
+  redis:
+    ports: []
+    restart: unless-stopped
+
+  qwen-vl:
+    restart: unless-stopped
+
+  backend:
+    volumes: []  # no bind mount — use the image as built
+    ports: []    # only reachable via nginx
+    restart: unless-stopped
+    command: >
+      gunicorn app.main:app
+      --workers 4
+      --worker-class uvicorn.workers.UvicornWorker
+      --bind 0.0.0.0:8000
+      --access-logfile -
+      --error-logfile -
+      --timeout 60
+
+  worker:
+    volumes: []
+    restart: unless-stopped
+    command: celery -A app.workers.celery_app worker --loglevel=info -Q discovery,crawl,audit,reporting,outreach --concurrency=4
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-https://your-domain.example/api/v1}
+    volumes: []
+    ports: []  # only reachable via nginx
+    restart: unless-stopped
+    command: node server.js
+
+  nginx:
+    image: nginx:1.27-alpine
+    depends_on:
+      - backend
+      - frontend
+    volumes:
+      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./infra/nginx/certs:/etc/nginx/certs:ro
+    ports:
+      - "80:80"
+      - "443:443"
+    restart: unless-stopped
