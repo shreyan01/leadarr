@@ -10,13 +10,18 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, PostgresDsn, RedisDsn, SecretStr, field_validator
+from pydantic import Field, PostgresDsn, RedisDsn, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        # Checks both locations so this works whether the process is
+        # launched from the repo root (Docker Compose's env_file: .env)
+        # or from backend/ directly (e.g. `cd backend && alembic ...`,
+        # which is a common bare-metal workflow). Both are loaded if
+        # present; a later entry overrides an earlier one on conflict.
+        env_file=("../.env", ".env"),
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
@@ -27,7 +32,12 @@ class Settings(BaseSettings):
     ENVIRONMENT: Literal["development", "staging", "production"] = "development"
     DEBUG: bool = True
     API_V1_PREFIX: str = "/api/v1"
-    BACKEND_CORS_ORIGINS: list[str] = ["http://localhost:3000"]
+    # Stored as plain CSV text (not list[str]) so pydantic-settings never
+    # attempts to JSON-decode it — that auto-decoding of "complex" field
+    # types happens before any custom parsing logic runs, and unquoted CSV
+    # from a .env file (http://a,http://b) isn't valid JSON. Splitting into
+    # a list happens explicitly in the property below instead.
+    BACKEND_CORS_ORIGINS_CSV: str = Field(default="http://localhost:3000", alias="BACKEND_CORS_ORIGINS")
 
     # --- Database ---
     DATABASE_URL: PostgresDsn = Field(
@@ -52,11 +62,11 @@ class Settings(BaseSettings):
     # --- AI Providers ---
     AI_CHAT_PROVIDER: Literal[
         "openai", "anthropic", "gemini", "ollama", "openrouter", "qwen"
-    ] = "anthropic"
+    ] = "qwen"
     AI_VISION_PROVIDER: Literal[
         "openai", "anthropic", "gemini", "qwen_vl", "ollama"
     ] = "qwen_vl"
-    AI_EMBEDDING_PROVIDER: Literal["openai", "gemini", "ollama"] = "openai"
+    AI_EMBEDDING_PROVIDER: Literal["openai", "gemini", "ollama", "qwen"] = "qwen"
 
     ANTHROPIC_API_KEY: SecretStr | None = None
     OPENAI_API_KEY: SecretStr | None = None
@@ -64,9 +74,11 @@ class Settings(BaseSettings):
     OPENROUTER_API_KEY: SecretStr | None = None
     OLLAMA_BASE_URL: str = "http://ollama:11434"
     QWEN_VL_BASE_URL: str = "http://qwen-vl:8001"
+    QWEN_EMBED_BASE_URL: str = "http://qwen-embed:8002"
 
-    DEFAULT_CHAT_MODEL: str = "claude-sonnet-4-6"
+    DEFAULT_CHAT_MODEL: str = "qwen2.5-vl-7b"
     DEFAULT_VISION_MODEL: str = "qwen2.5-vl-7b"
+    DEFAULT_EMBEDDING_MODEL: str = "qwen3-embedding-0.6b"
 
     # --- Email ---
     EMAIL_PROVIDER: Literal["smtp", "resend", "sendgrid", "ses"] = "smtp"
@@ -80,7 +92,7 @@ class Settings(BaseSettings):
     EMAIL_FROM_ADDRESS: str = "noreply@leadforge.local"
 
     # --- Discovery ---
-    DISCOVERY_PROVIDER: Literal["google_places", "osm"] = "google_places"
+    DISCOVERY_PROVIDER: Literal["google_places", "osm"] = "osm"
     GOOGLE_PLACES_API_KEY: SecretStr | None = None
 
     # --- Storage ---
@@ -98,12 +110,9 @@ class Settings(BaseSettings):
     # --- Rate limiting ---
     RATE_LIMIT_PER_MINUTE: int = 60
 
-    @field_validator("BACKEND_CORS_ORIGINS", mode="before")
-    @classmethod
-    def _split_cors(cls, v: str | list[str]) -> list[str]:
-        if isinstance(v, str):
-            return [origin.strip() for origin in v.split(",")]
-        return v
+    @property
+    def BACKEND_CORS_ORIGINS(self) -> list[str]:
+        return [origin.strip() for origin in self.BACKEND_CORS_ORIGINS_CSV.split(",") if origin.strip()]
 
 
 @lru_cache

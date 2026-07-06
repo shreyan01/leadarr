@@ -16,16 +16,20 @@ export interface Business {
   name: string;
   category: string;
   phone: string | null;
+  email: string | null;
   address: string | null;
   city: string;
   country: string;
   latitude: number | null;
   longitude: number | null;
   website_url: string | null;
+  facebook_url: string | null;
+  instagram_url: string | null;
   google_rating: number | null;
   review_count: number | null;
   status: BusinessStatus;
   discovered_at: string | null;
+  is_social_only_lead: boolean;
 }
 
 export interface BusinessListResponse {

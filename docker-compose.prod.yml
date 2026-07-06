@@ -42,8 +42,6 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-      args:
-        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-https://your-domain.example/api/v1}
     volumes: []
     ports: []  # only reachable via nginx
     restart: unless-stopped

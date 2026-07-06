@@ -1,8 +1,9 @@
-FROM python:3.12-slim AS base
+FROM python:3.12-slim-bookworm AS base
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1
+    PIP_NO_CACHE_DIR=1 \
+    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
 WORKDIR /app
 
@@ -13,9 +14,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
-# Playwright browsers are only needed on the worker image; installed here too
-# so `docker compose run backend playwright install` works in dev without a rebuild.
-RUN playwright install --with-deps chromium || true
+# Installed to a fixed path (PLAYWRIGHT_BROWSERS_PATH above) rather than
+# the installing user's home directory. This step runs as root, but the
+# container runs as the unprivileged `leadforge` user below — without a
+# fixed shared path, root's browser install lands in /root/.cache and is
+# invisible to the leadforge user at runtime ("Executable doesn't exist").
+# No `|| true` here: if this fails, the build should fail loudly, not
+# silently produce an image that's broken at first real use.
+RUN playwright install --with-deps chromium && chmod -R a+rx /ms-playwright
 
 COPY . .
 

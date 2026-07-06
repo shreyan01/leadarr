@@ -179,7 +179,13 @@ export default function BusinessesPage() {
                     <Link href={`/businesses/${business.id}`} className="font-medium text-ink hover:text-brass">
                       {business.name}
                     </Link>
-                    <div className="text-xs text-ink-faint">{business.website_url}</div>
+                    {business.website_url ? (
+                      <div className="text-xs text-ink-faint">{business.website_url}</div>
+                    ) : business.is_social_only_lead ? (
+                      <div className="mt-1 inline-flex items-center gap-1 rounded-full border border-brass/40 bg-brass/10 px-2 py-0.5 text-xs text-brass">
+                        No website — {business.facebook_url ? "Facebook" : business.instagram_url ? "Instagram" : "phone"} only
+                      </div>
+                    ) : null}
                   </td>
                   <td className="px-4 py-3 text-ink-muted">{business.city}</td>
                   <td className="px-4 py-3 text-ink-muted">{business.category}</td>

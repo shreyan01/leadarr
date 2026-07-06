@@ -25,6 +25,9 @@ class DiscoveredBusiness:
     provider_place_id: str | None
     google_rating: float | None
     review_count: int | None
+    email: str | None = None
+    facebook_url: str | None = None
+    instagram_url: str | None = None
 
 
 class DiscoveryProvider(Protocol):

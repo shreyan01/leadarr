@@ -34,16 +34,20 @@ class BusinessOut(BaseModel):
     name: str
     category: str
     phone: str | None
+    email: str | None
     address: str | None
     city: str
     country: str
     latitude: float | None
     longitude: float | None
     website_url: str | None
+    facebook_url: str | None
+    instagram_url: str | None
     google_rating: float | None
     review_count: int | None
     status: BusinessStatus
     discovered_at: datetime | None
+    is_social_only_lead: bool
 
 
 class BusinessListResponse(BaseModel):

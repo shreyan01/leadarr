@@ -17,7 +17,12 @@ import type {
   VisionAnalysis,
 } from "./types";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
+// Relative by default — resolves against whatever origin actually served
+// the page (localhost:3000, a Cloudflare Tunnel URL, a real domain, ...),
+// and next.config.js's rewrites() forwards it to the backend internally.
+// Override with an absolute URL only if the frontend and backend are ever
+// deployed on genuinely different origins.
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api/v1";
 
 const ACCESS_TOKEN_KEY = "leadforge_access_token";
 const REFRESH_TOKEN_KEY = "leadforge_refresh_token";

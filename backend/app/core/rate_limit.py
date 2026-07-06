@@ -4,8 +4,15 @@ Applied via FastAPI dependency on auth and audit-trigger endpoints per
 ARCHITECTURE.md §6. Keyed by client IP for unauthenticated endpoints
 (login/register) and by user id for authenticated ones, so one abusive
 client can't exhaust another's quota.
+
+Note: this module deliberately does NOT use
+``from __future__ import annotations``. With it enabled, FastAPI/Pydantic
+2.9.2 fails to resolve the ``Request`` forward reference on
+``RateLimiter.__call__`` (a bound-method dependency), raising
+PydanticUndefinedAnnotation at app startup. Plain runtime annotations
+resolve correctly here; `X | None` still works without the future import
+on Python 3.10+.
 """
-from __future__ import annotations
 
 from fastapi import Depends, HTTPException, Request, status
 from redis.asyncio import Redis

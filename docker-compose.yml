@@ -34,13 +34,37 @@ services:
   # input. Model weights are pulled from Hugging Face into `qwen_model_cache`
   # on first start (nothing is sent to a hosted vision API). Requires an
   # NVIDIA GPU + the NVIDIA Container Toolkit on the host.
+  #
+  # Uses the AWQ-quantized checkpoint (~6-8GB VRAM) rather than full
+  # precision (~16-18GB) — full precision won't fit on most single consumer
+  # GPUs at all, let alone alongside anything else already using VRAM.
+  # --gpu-memory-utilization is a fraction of TOTAL GPU memory (not free
+  # memory) that vLLM is allowed to reserve upfront; 0.4 leaves headroom for
+  # qwen-embed below plus whatever else is already running on the host GPU.
+  #
+  # --enforce-eager skips vLLM's torch.compile/CUDA-graph capture step. That
+  # step needs a large, unpredictable memory spike on top of steady-state
+  # usage — on a nearly-full GPU it's what actually causes startup OOMs, not
+  # the model weights themselves. Eager mode trades a bit of throughput for
+  # a much smaller, predictable memory footprint; fine for a single-user
+  # local tool. --limit-mm-per-prompt disables video support (we only ever
+  # send screenshots) so vLLM doesn't also profile a much more expensive
+  # dummy video-encoder pass on startup that we'd never use anyway.
+  #
+  # If you still hit a CUDA OOM on startup, lower --gpu-memory-utilization
+  # further (e.g. 0.3) or close other GPU-using applications first.
   qwen-vl:
     image: vllm/vllm-openai:latest
     command:
-      - --model=Qwen/Qwen2.5-VL-7B-Instruct
+      - --model=Qwen/Qwen2.5-VL-7B-Instruct-AWQ
       - --served-model-name=qwen2.5-vl-7b
+      - --quantization=awq
       - --port=8001
       - --max-model-len=8192
+      - --gpu-memory-utilization=0.4
+      - --enforce-eager
+      - --limit-mm-per-prompt
+      - '{"image": 5, "video": 0}'
     ports:
       - "8001:8001"
     volumes:
@@ -52,11 +76,54 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 300s  # first boot downloads+loads weights; can take a while
     # No GPU on this machine? Swap the image/command above for Ollama instead:
     #   image: ollama/ollama:latest
     #   command: ["serve"]
     # then `docker compose exec qwen-vl ollama pull qwen2.5vl:7b` and set
     # QWEN_VL_BASE_URL=http://qwen-vl:11434 in .env.
+
+  # Dedicated local embedding model — Qwen3-Embedding-0.6B is a different
+  # architecture from Qwen2.5-VL (embedding models aren't chat/vision
+  # models), so it runs as its own small service. At 0.6B params it needs
+  # only ~2GB VRAM. --gpu-memory-utilization capped low since it's sharing
+  # the GPU with qwen-vl above — see that service's comment for the math.
+  # depends_on qwen-vl being healthy first so the two services' expensive
+  # startup phases (weight load + profiling) don't spike GPU memory at the
+  # same time — that overlap was the actual cause of the original OOM.
+  qwen-embed:
+    image: vllm/vllm-openai:latest
+    command:
+      - --model=Qwen/Qwen3-Embedding-0.6B
+      - --served-model-name=qwen3-embedding-0.6b
+      - --runner=pooling
+      - --port=8002
+      - --gpu-memory-utilization=0.12
+      - --enforce-eager
+    ports:
+      - "8002:8002"
+    volumes:
+      - qwen_model_cache:/root/.cache/huggingface
+    depends_on:
+      qwen-vl:
+        condition: service_healthy
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    # No GPU / GPU already busy with qwen-vl? Swap for Ollama:
+    #   image: ollama/ollama:latest
+    #   command: ["serve"]
+    # then `docker compose exec qwen-embed ollama pull dengcao/Qwen3-Embedding-0.6B`
+    # and set QWEN_EMBED_BASE_URL=http://qwen-embed:11434 in .env.
 
   backend:
     build: ./backend
@@ -87,9 +154,9 @@ services:
     command: celery -A app.workers.celery_app worker --loglevel=info -Q discovery,crawl,audit,reporting,outreach
 
   frontend:
-    build: ./frontend
-    environment:
-      NEXT_PUBLIC_API_BASE_URL: http://localhost:8000/api/v1
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
     volumes:
       - ./frontend:/app
       - /app/node_modules

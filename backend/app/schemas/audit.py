@@ -14,7 +14,7 @@ class AuditJobAccepted(BaseModel):
 
 
 class JobEventOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
 
     stage: str
     status: JobEventStatus
@@ -81,7 +81,7 @@ class AIReportOut(BaseModel):
 
 
 class VisionAnalysisOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
 
     screenshot_id: uuid.UUID
     provider: str
