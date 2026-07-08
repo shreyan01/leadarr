@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from app.services.crawl.html_parser import (
+    detect_google_business_link,
+    extract_all_links,
     extract_buttons,
     extract_css_files,
     extract_favicon,
@@ -92,3 +94,31 @@ def test_parse_sitemap_urls_extracts_loc_entries():
     <url><loc>https://acmeroofing.example.com/contact</loc></url></urlset>"""
     urls = parse_sitemap_urls(xml)
     assert urls == ["https://acmeroofing.example.com/", "https://acmeroofing.example.com/contact"]
+
+
+def test_extract_all_links_dedupes_and_stays_same_origin():
+    html = """
+    <a href="/about">About</a>
+    <a href="/about">About again</a>
+    <a href="https://external.example.com/">External</a>
+    <a href="#section">Anchor only</a>
+    <a href="mailto:test@example.com">Email</a>
+    """
+    links = extract_all_links(html, BASE_URL)
+    assert links == [f"{BASE_URL}/about"]
+
+
+def test_extract_all_links_respects_limit():
+    html = "".join(f'<a href="/page{i}">Page {i}</a>' for i in range(50))
+    links = extract_all_links(html, BASE_URL, limit=5)
+    assert len(links) == 5
+
+
+def test_detect_google_business_link_finds_maps_url():
+    html = '<a href="https://www.google.com/maps/place/Acme+Roofing">Find us</a>'
+    assert detect_google_business_link(html) is not None
+
+
+def test_detect_google_business_link_returns_none_when_absent():
+    html = '<a href="/contact">Contact</a>'
+    assert detect_google_business_link(html) is None

@@ -57,3 +57,23 @@ class TestBusinessesApi:
     def test_businesses_require_authentication(self, client: TestClient):
         response = client.get("/api/v1/businesses")
         assert response.status_code == 401
+
+    def test_delete_business_removes_it(self, client: TestClient, auth_headers: dict[str, str]):
+        create_response = client.post(
+            "/api/v1/businesses",
+            json={"name": "Acme Roofing", "category": "Roofing", "city": "Austin", "country": "United States"},
+            headers=auth_headers,
+        )
+        business_id = create_response.json()["id"]
+
+        delete_response = client.delete(f"/api/v1/businesses/{business_id}", headers=auth_headers)
+        assert delete_response.status_code == 204
+
+        get_response = client.get(f"/api/v1/businesses/{business_id}", headers=auth_headers)
+        assert get_response.status_code == 404
+
+    def test_delete_nonexistent_business_returns_404(self, client: TestClient, auth_headers: dict[str, str]):
+        response = client.delete(
+            "/api/v1/businesses/00000000-0000-0000-0000-000000000000", headers=auth_headers
+        )
+        assert response.status_code == 404

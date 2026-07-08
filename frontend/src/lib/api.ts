@@ -13,6 +13,7 @@ import type {
   OutreachEmail,
   Screenshot,
   SecurityFinding,
+  TechnicalFinding,
   User,
   VisionAnalysis,
 } from "./types";
@@ -150,7 +151,17 @@ export const api = {
       return request<BusinessListResponse>(`/businesses${qs ? `?${qs}` : ""}`);
     },
     get: (id: string) => request<Business>(`/businesses/${id}`),
+    create: (data: {
+      name: string;
+      category: string;
+      city: string;
+      country: string;
+      website_url?: string;
+      phone?: string;
+      address?: string;
+    }) => request<Business>("/businesses", { method: "POST", body: data }),
     archive: (id: string) => request<Business>(`/businesses/${id}/archive`, { method: "PATCH" }),
+    delete: (id: string) => request<void>(`/businesses/${id}`, { method: "DELETE" }),
   },
 
   discovery: {
@@ -172,6 +183,7 @@ export const api = {
     lighthouse: (auditJobId: string) => request<LighthouseReport>(`/audits/${auditJobId}/lighthouse`),
     accessibility: (auditJobId: string) => request<AccessibilityFinding>(`/audits/${auditJobId}/accessibility`),
     security: (auditJobId: string) => request<SecurityFinding>(`/audits/${auditJobId}/security`),
+    technical: (auditJobId: string) => request<TechnicalFinding>(`/audits/${auditJobId}/technical`),
     vision: (auditJobId: string) => request<VisionAnalysis[]>(`/audits/${auditJobId}/vision`),
     screenshots: (auditJobId: string) => request<Screenshot[]>(`/audits/${auditJobId}/screenshots`),
     report: (auditJobId: string) => request<AIReport>(`/audits/${auditJobId}/report`),

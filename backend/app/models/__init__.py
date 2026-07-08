@@ -10,6 +10,7 @@ from app.models.lighthouse_report import LighthouseReport
 from app.models.outreach_email import OutreachEmail
 from app.models.security_finding import SecurityFinding
 from app.models.setting import Setting
+from app.models.technical_finding import TechnicalFinding
 from app.models.user import Organization, User
 from app.models.vision_analysis import VisionAnalysis
 from app.models.website_snapshot import Screenshot, WebsiteSnapshot
@@ -27,6 +28,7 @@ __all__ = [
     "OutreachEmail",
     "SecurityFinding",
     "Setting",
+    "TechnicalFinding",
     "Organization",
     "User",
     "VisionAnalysis",

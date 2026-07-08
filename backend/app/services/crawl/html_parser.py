@@ -170,6 +170,40 @@ def extract_clickable_non_interactive_elements(html: str) -> list[dict]:
 
 
 
+def extract_all_links(html: str, base_url: str, *, same_origin_only: bool = True, limit: int = 30) -> list[str]:
+    """All distinct <a href> links on the page, for broken-link checking.
+    Capped and same-origin by default — checking every external link on
+    the internet isn't the goal, just the site's own navigable pages."""
+    soup = BeautifulSoup(html, "html.parser")
+    seen: list[str] = []
+    for a in soup.find_all("a", href=True):
+        href = a["href"].strip()
+        if not href or href.startswith(("#", "mailto:", "tel:", "javascript:")):
+            continue
+        resolved = urljoin(base_url, href)
+        if same_origin_only and not same_origin(resolved, base_url):
+            continue
+        if resolved not in seen:
+            seen.append(resolved)
+        if len(seen) >= limit:
+            break
+    return seen
+
+
+def detect_google_business_link(html: str) -> str | None:
+    """A business linking to its own Google Business/Maps listing from
+    their site — checkable without the Places API. Doesn't tell us whether
+    a listing exists if they *don't* link to one, only confirms it when
+    they do."""
+    soup = BeautifulSoup(html, "html.parser")
+    for a in soup.find_all("a", href=True):
+        href = a["href"]
+        if re.search(r"google\.com/maps|g\.page|business\.google\.com", href, re.I):
+            return href
+    return None
+
+
+
 def parse_sitemap_urls(sitemap_xml: str) -> list[str]:
     soup = BeautifulSoup(sitemap_xml, "xml")
     return [loc.get_text(strip=True) for loc in soup.find_all("loc")]

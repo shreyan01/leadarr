@@ -71,14 +71,44 @@ async def draft_email(
 
     report = await _latest_report_for_business(business_id, report_repo)
     if report is None:
-        raise LeadForgeError("No AI report found for this business yet — run an audit first.")
+        if business.website_url:
+            raise LeadForgeError("No AI report found for this business yet — run an audit first.")
+        # No website at all means no audit is even possible for this
+        # business — the "you don't have a website yet" pitch is a
+        # legitimate, often strong lead in its own right (see
+        # Business.is_social_only_lead), so it shouldn't be permanently
+        # blocked on a report that can never exist. Falls back to a
+        # summary built from whatever contact info discovery actually found.
+        contact_channels = [
+            c
+            for c in [
+                "a Facebook page" if business.facebook_url else None,
+                "an Instagram page" if business.instagram_url else None,
+                "a phone number" if business.phone else None,
+            ]
+            if c
+        ]
+        channels_text = " and ".join(contact_channels) if contact_channels else "no online presence we could find"
+        executive_summary = (
+            f"{business.name} does not appear to have a website. They currently have {channels_text}."
+        )
+        top_improvements = [
+            {
+                "title": "Build a professional website",
+                "detail": "No website was found for this business during discovery.",
+                "category": "design",
+            }
+        ]
+    else:
+        executive_summary = report.executive_summary or ""
+        top_improvements = (report.top_improvements or {}).get("items", [])
 
     email_inputs = EmailInputs(
         business_name=business.name,
         category=business.category,
         sender_agency_name=settings.APP_NAME,
-        executive_summary=report.executive_summary or "",
-        top_improvements=(report.top_improvements or {}).get("items", []),
+        executive_summary=executive_summary,
+        top_improvements=top_improvements,
         lead_score=None,
         priority=None,
         template_key=payload.template_key,

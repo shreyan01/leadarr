@@ -11,6 +11,7 @@ from app.core.di import (
     get_business_repository,
     get_lighthouse_report_repository,
     get_security_finding_repository,
+    get_technical_finding_repository,
     get_vision_analysis_repository,
     get_website_snapshot_repository,
 )
@@ -26,6 +27,7 @@ from app.repositories.finding_repository import (
     SecurityFindingRepository,
     VisionAnalysisRepository,
 )
+from app.repositories.technical_finding_repository import TechnicalFindingRepository
 from app.schemas.audit import (
     AccessibilityFindingOut,
     AIReportOut,
@@ -34,6 +36,7 @@ from app.schemas.audit import (
     LighthouseReportOut,
     ScreenshotOut,
     SecurityFindingOut,
+    TechnicalFindingOut,
     VisionAnalysisOut,
 )
 from app.workers.tasks.audit import build_audit_pipeline
@@ -124,6 +127,18 @@ async def get_security_findings(
     finding = await repo.get_by_audit_job(audit_job_id)
     if finding is None:
         raise NotFoundError("Security findings not found for this audit job.")
+    return finding
+
+
+@router.get("/audits/{audit_job_id}/technical", response_model=TechnicalFindingOut)
+async def get_technical_findings(
+    audit_job_id: uuid.UUID,
+    token: TokenPayload = Depends(get_current_token),
+    repo: TechnicalFindingRepository = Depends(get_technical_finding_repository),
+):
+    finding = await repo.get_by_audit_job(audit_job_id)
+    if finding is None:
+        raise NotFoundError("Technical findings not found for this audit job.")
     return finding
 
 

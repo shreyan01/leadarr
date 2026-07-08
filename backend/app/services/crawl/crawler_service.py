@@ -9,11 +9,13 @@ the target rather than reads it.
 """
 from __future__ import annotations
 
+import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
 import httpx
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from playwright.async_api import async_playwright
 
 from app.core.config import Settings
@@ -55,6 +57,7 @@ class CrawlResult:
     fonts: list[str]
     js_files: list[str]
     css_files: list[str]
+    page_load_time_ms: float
     screenshots: list[ScreenshotArtifact] = field(default_factory=list)
     crawled_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -73,7 +76,22 @@ class CrawlerService:
             browser = await pw.chromium.launch(headless=self._settings.PLAYWRIGHT_HEADLESS)
             try:
                 page = await browser.new_page(viewport=_VIEWPORTS["desktop"])
-                response = await page.goto(url, wait_until="networkidle", timeout=30_000)
+                nav_start = time.monotonic()
+                # "load" rather than "networkidle": plenty of real sites
+                # (chat widgets, analytics beacons, ad trackers that poll
+                # forever) never go fully network-idle, which turned a
+                # normal page load into a spurious 30s timeout failure.
+                # "load" only waits for the page's own load event, not for
+                # background requests to stop entirely.
+                try:
+                    response = await page.goto(url, wait_until="load", timeout=45_000)
+                except PlaywrightTimeoutError:
+                    # Even "load" can time out on a handful of genuinely slow
+                    # or broken sites. Rather than fail the whole audit, fall
+                    # back to whatever rendered so far — a partial crawl of a
+                    # slow site is more useful than no audit at all.
+                    response = None
+                page_load_time_ms = (time.monotonic() - nav_start) * 1000
                 final_url = page.url
                 http_status = response.status if response else 0
                 redirect_chain = self._build_redirect_chain(response, final_url)
@@ -107,6 +125,7 @@ class CrawlerService:
             fonts=html_parser.extract_fonts(html, final_url),
             js_files=html_parser.extract_js_files(html, final_url),
             css_files=html_parser.extract_css_files(html, final_url),
+            page_load_time_ms=page_load_time_ms,
             screenshots=screenshots,
         )
 

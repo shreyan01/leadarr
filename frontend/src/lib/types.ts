@@ -113,6 +113,23 @@ export interface SecurityFinding {
   hygiene_score: number | null;
 }
 
+export interface TechnicalFinding {
+  page_load_time_ms: number | null;
+  sitemap_present: boolean | null;
+  robots_present: boolean | null;
+  favicon_present: boolean | null;
+  schema_markup_present: boolean | null;
+  schema_markup_valid: boolean | null;
+  open_graph_present: boolean | null;
+  twitter_card_present: boolean | null;
+  google_business_link: string | null;
+  broken_links: { items: Array<{ url: string; status: number | null }> } | null;
+  broken_links_count: number | null;
+  oversized_images: { items: Array<{ url: string; size_bytes: number; reason: string }> } | null;
+  oversized_images_count: number | null;
+  technical_score: number | null;
+}
+
 export type ScreenshotDevice = "desktop" | "tablet" | "mobile";
 
 export interface Screenshot {

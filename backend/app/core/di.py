@@ -33,6 +33,10 @@ from app.repositories.finding_repository import (
 )
 from app.repositories.lead_score_repository import LeadScoreRepository, SqlAlchemyLeadScoreRepository
 from app.repositories.outreach_email_repository import OutreachEmailRepository, SqlAlchemyOutreachEmailRepository
+from app.repositories.technical_finding_repository import (
+    SqlAlchemyTechnicalFindingRepository,
+    TechnicalFindingRepository,
+)
 from app.repositories.user_repository import SqlAlchemyUserRepository, UserRepository
 from app.services.outreach.email_send_service import EmailSendService
 from app.services.auth_service import AuthService
@@ -97,6 +101,10 @@ def get_ai_report_repository(session: AsyncSession = Depends(get_db)) -> AIRepor
 
 def get_lead_score_repository(session: AsyncSession = Depends(get_db)) -> LeadScoreRepository:
     return SqlAlchemyLeadScoreRepository(session)
+
+
+def get_technical_finding_repository(session: AsyncSession = Depends(get_db)) -> TechnicalFindingRepository:
+    return SqlAlchemyTechnicalFindingRepository(session)
 
 
 def get_outreach_email_repository(session: AsyncSession = Depends(get_db)) -> OutreachEmailRepository:

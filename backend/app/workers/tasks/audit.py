@@ -26,6 +26,7 @@ from app.repositories.finding_repository import (
 )
 from app.repositories.lead_score_repository import SqlAlchemyLeadScoreRepository
 from app.repositories.outreach_email_repository import SqlAlchemyOutreachEmailRepository
+from app.repositories.technical_finding_repository import SqlAlchemyTechnicalFindingRepository
 from app.services.accessibility.accessibility_stage_service import AccessibilityStageService
 from app.services.lighthouse.lighthouse_stage_service import LighthouseStageService
 from app.services.outreach.email_prompts import EmailInputs
@@ -33,11 +34,13 @@ from app.services.outreach.email_stage_service import EmailDraftStageService
 from app.services.outreach.email_templates import DEFAULT_TEMPLATE_KEY
 from app.services.reporting.report_prompts import ReportInputs
 from app.services.reporting.report_stage_service import ReportStageService
+from app.services.technical.technical_stage_service import TechnicalAuditStageService
 from app.services.scoring.lead_scoring_engine import ScoreInputs
 from app.services.scoring.scoring_stage_service import ScoringStageService
 from app.services.security_audit.security_audit_service import SecurityAuditStageService
 from app.services.vision.vision_stage_service import VisionStageService
 from app.utils.storage import get_storage_backend
+from app.workers.async_utils import run_worker_task
 from app.workers.celery_app import celery_app  # noqa: F401
 from app.workers.tasks.crawl import run_crawl
 
@@ -46,11 +49,7 @@ logger = get_logger(__name__)
 
 @shared_task(name="app.workers.tasks.audit.run_lighthouse", bind=True, max_retries=2, default_retry_delay=30)
 def run_lighthouse(self, previous_result: dict) -> dict:
-    try:
-        return asyncio.run(_run_lighthouse_async(previous_result))
-    except Exception as exc:  # noqa: BLE001
-        logger.error("lighthouse_task_failed", previous_result=previous_result, error=str(exc))
-        raise self.retry(exc=exc) from exc
+    return run_worker_task(_run_lighthouse_async(previous_result))
 
 
 async def _run_lighthouse_async(previous_result: dict) -> dict:
@@ -66,22 +65,43 @@ async def _run_lighthouse_async(previous_result: dict) -> dict:
             report_repo=SqlAlchemyLighthouseReportRepository(session),
             audit_job_repo=SqlAlchemyAuditJobRepository(session),
         )
-        report = await service.run(audit_job_id=audit_job_id, business_id=business_id, url=url)
-        await session.commit()
-        return {
-            "audit_job_id": str(audit_job_id),
-            "business_id": str(business_id),
-            "performance_score": report.performance_score,
-            "accessibility_score": report.accessibility_score,
-            "seo_score": report.seo_score,
-            "best_practices_score": report.best_practices_score,
-        }
+        try:
+            report = await service.run(audit_job_id=audit_job_id, business_id=business_id, url=url)
+            await session.commit()
+            return {
+                "audit_job_id": str(audit_job_id),
+                "business_id": str(business_id),
+                "performance_score": report.performance_score,
+                "accessibility_score": report.accessibility_score,
+                "seo_score": report.seo_score,
+                "best_practices_score": report.best_practices_score,
+            }
+        except Exception as exc:
+            # LighthouseStageService.run() already logged a FAILED job_event
+            # with the real error before re-raising — that's still visible
+            # on the audit detail page per-stage. We just don't let it take
+            # the rest of the audit down with it: real browser automation
+            # (unlike every other stage, which is plain HTTP/static analysis)
+            # is inherently the most fragile link here, and Lighthouse's own
+            # numbers being unavailable doesn't block anything downstream.
+            logger.warning(
+                "lighthouse_failed_continuing_pipeline", audit_job_id=str(audit_job_id), error=str(exc)[:500]
+            )
+            await session.commit()
+            return {
+                "audit_job_id": str(audit_job_id),
+                "business_id": str(business_id),
+                "performance_score": None,
+                "accessibility_score": None,
+                "seo_score": None,
+                "best_practices_score": None,
+            }
 
 
 @shared_task(name="app.workers.tasks.audit.run_accessibility", bind=True, max_retries=2, default_retry_delay=30)
 def run_accessibility(self, previous_result: dict) -> dict:
     try:
-        return asyncio.run(_run_accessibility_async(previous_result))
+        return run_worker_task(_run_accessibility_async(previous_result))
     except Exception as exc:  # noqa: BLE001
         logger.error("accessibility_task_failed", previous_result=previous_result, error=str(exc))
         raise self.retry(exc=exc) from exc
@@ -109,7 +129,7 @@ async def _run_accessibility_async(previous_result: dict) -> dict:
 @shared_task(name="app.workers.tasks.audit.run_security_audit", bind=True, max_retries=2, default_retry_delay=30)
 def run_security_audit(self, previous_result: dict) -> dict:
     try:
-        return asyncio.run(_run_security_audit_async(previous_result))
+        return run_worker_task(_run_security_audit_async(previous_result))
     except Exception as exc:  # noqa: BLE001
         logger.error("security_audit_task_failed", previous_result=previous_result, error=str(exc))
         raise self.retry(exc=exc) from exc
@@ -131,10 +151,36 @@ async def _run_security_audit_async(previous_result: dict) -> dict:
         return {**previous_result, "hygiene_score": finding.hygiene_score}
 
 
+@shared_task(name="app.workers.tasks.audit.run_technical_audit", bind=True, max_retries=2, default_retry_delay=30)
+def run_technical_audit(self, previous_result: dict) -> dict:
+    try:
+        return run_worker_task(_run_technical_audit_async(previous_result))
+    except Exception as exc:  # noqa: BLE001
+        logger.error("technical_audit_task_failed", previous_result=previous_result, error=str(exc))
+        raise self.retry(exc=exc) from exc
+
+
+async def _run_technical_audit_async(previous_result: dict) -> dict:
+    settings = get_settings()
+    audit_job_id = uuid.UUID(previous_result["audit_job_id"])
+
+    async with AsyncSessionLocal() as session:
+        snapshot = await SqlAlchemyWebsiteSnapshotRepository(session).get_by_audit_job(audit_job_id)
+        if snapshot is None:
+            raise RuntimeError(f"No website snapshot found for audit job {audit_job_id}; crawl stage may have failed.")
+
+        finding_repo = SqlAlchemyTechnicalFindingRepository(session)
+        audit_job_repo = SqlAlchemyAuditJobRepository(session)
+        service = TechnicalAuditStageService(get_storage_backend(settings), finding_repo, audit_job_repo)
+        finding = await service.run(audit_job_id=audit_job_id, snapshot=snapshot)
+        await session.commit()
+        return {**previous_result, "technical_score": finding.technical_score}
+
+
 @shared_task(name="app.workers.tasks.audit.run_vision", bind=True, max_retries=2, default_retry_delay=30)
 def run_vision(self, previous_result: dict) -> dict:
     try:
-        return asyncio.run(_run_vision_async(previous_result))
+        return run_worker_task(_run_vision_async(previous_result))
     except Exception as exc:  # noqa: BLE001
         logger.error("vision_task_failed", previous_result=previous_result, error=str(exc))
         raise self.retry(exc=exc) from exc
@@ -171,7 +217,7 @@ async def _run_vision_async(previous_result: dict) -> dict:
 @shared_task(name="app.workers.tasks.audit.run_scoring", bind=True, max_retries=2, default_retry_delay=30)
 def run_scoring(self, previous_result: dict) -> dict:
     try:
-        return asyncio.run(_run_scoring_async(previous_result))
+        return run_worker_task(_run_scoring_async(previous_result))
     except Exception as exc:  # noqa: BLE001
         logger.error("scoring_task_failed", previous_result=previous_result, error=str(exc))
         raise self.retry(exc=exc) from exc
@@ -217,7 +263,7 @@ async def _run_scoring_async(previous_result: dict) -> dict:
 @shared_task(name="app.workers.tasks.audit.run_reporting", bind=True, max_retries=2, default_retry_delay=30)
 def run_reporting(self, previous_result: dict) -> dict:
     try:
-        return asyncio.run(_run_reporting_async(previous_result))
+        return run_worker_task(_run_reporting_async(previous_result))
     except Exception as exc:  # noqa: BLE001
         logger.error("reporting_task_failed", previous_result=previous_result, error=str(exc))
         raise self.retry(exc=exc) from exc
@@ -291,7 +337,7 @@ def _serialize(model_instance, fields: list[str]) -> dict:
 @shared_task(name="app.workers.tasks.audit.run_outreach_draft", bind=True, max_retries=2, default_retry_delay=30)
 def run_outreach_draft(self, previous_result: dict) -> dict:
     try:
-        return asyncio.run(_run_outreach_draft_async(previous_result))
+        return run_worker_task(_run_outreach_draft_async(previous_result))
     except Exception as exc:  # noqa: BLE001
         logger.error("outreach_draft_task_failed", previous_result=previous_result, error=str(exc))
         raise self.retry(exc=exc) from exc
@@ -345,13 +391,17 @@ async def _run_outreach_draft_async(previous_result: dict) -> dict:
 
 
 @shared_task(name="app.workers.tasks.audit.mark_pipeline_failed")
-def mark_pipeline_failed(failed_task_id: str, audit_job_id: str, stage: str = "pipeline") -> None:
-    """Celery ``link_error`` callback. Celery invokes this with the failed
-    task's id prepended to whatever args were already bound via ``.s(...)``,
-    so ``audit_job_id``/``stage`` arrive as the pre-bound kwargs below.
-    Records the failure on the AuditJob row so `GET /audits/{id}` reflects it
-    even though the chain stopped short."""
-    asyncio.run(_mark_failed_async(audit_job_id, stage, f"Pipeline task {failed_task_id} failed"))
+def mark_pipeline_failed(request, exc, traceback, audit_job_id: str, stage: str = "pipeline") -> None:
+    """Celery ``link_error`` callback. When triggered via a chain's
+    ``on_error``, Celery calls this with three positional arguments —
+    (request, exc, traceback) — followed by whatever kwargs were bound via
+    ``.s(audit_job_id=...)``. (An earlier version of this function assumed
+    a single failed-task-id argument instead, which crashed with "got
+    multiple values for argument" the first time a real pipeline failure
+    exercised this path.) Records the failure — including the real
+    exception message — on the AuditJob row so `GET /audits/{id}` reflects
+    it even though the chain stopped short."""
+    run_worker_task(_mark_failed_async(audit_job_id, stage, f"Pipeline stage failed: {exc}"))
 
 
 async def _mark_failed_async(audit_job_id: str, stage: str, error_message: str) -> None:
@@ -365,8 +415,8 @@ async def _mark_failed_async(audit_job_id: str, stage: str, error_message: str) 
 def build_audit_pipeline(audit_job_id: uuid.UUID, business_id: uuid.UUID):
     """Returns the Celery chain implementing the pipeline documented in
     ARCHITECTURE.md §4, for the stages implemented so far:
-    crawl -> lighthouse -> accessibility -> security_audit -> vision ->
-    scoring -> reporting -> outreach_draft.
+    crawl -> lighthouse -> accessibility -> security_audit ->
+    technical_audit -> vision -> scoring -> reporting -> outreach_draft.
     Note: scoring runs before reporting (rather than after, as the product
     brief's stage list orders them) so the generated report can reference
     the lead score/priority — reordering two adjacent, independent stages
@@ -378,6 +428,7 @@ def build_audit_pipeline(audit_job_id: uuid.UUID, business_id: uuid.UUID):
         run_lighthouse.s(),
         run_accessibility.s(),
         run_security_audit.s(),
+        run_technical_audit.s(),
         run_vision.s(),
         run_scoring.s(),
         run_reporting.s(),

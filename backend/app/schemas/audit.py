@@ -101,6 +101,25 @@ class VisionAnalysisOut(BaseModel):
     overall_score: int | None
 
 
+class TechnicalFindingOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    page_load_time_ms: float | None
+    sitemap_present: bool | None
+    robots_present: bool | None
+    favicon_present: bool | None
+    schema_markup_present: bool | None
+    schema_markup_valid: bool | None
+    open_graph_present: bool | None
+    twitter_card_present: bool | None
+    google_business_link: str | None
+    broken_links: dict | None
+    broken_links_count: int | None
+    oversized_images: dict | None
+    oversized_images_count: int | None
+    technical_score: int | None
+
+
 class AccessibilityFindingOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

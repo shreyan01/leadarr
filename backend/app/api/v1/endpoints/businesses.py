@@ -94,3 +94,18 @@ async def archive_business(
     if business is None:
         raise NotFoundError("Business not found.")
     return business
+
+
+@router.delete("/{business_id}", status_code=204)
+async def delete_business(
+    business_id: uuid.UUID,
+    token: TokenPayload = Depends(require_role(Role.OWNER, Role.ADMIN, Role.ANALYST)),
+    repo: BusinessRepository = Depends(get_business_repository),
+):
+    """Hard delete — removes the business and everything derived from it
+    (audit jobs, screenshots, findings, lead scores, campaigns, outreach
+    emails) via cascading foreign keys. Use `/archive` instead if you just
+    want to hide a business without losing its audit history."""
+    deleted = await repo.delete(business_id)
+    if not deleted:
+        raise NotFoundError("Business not found.")

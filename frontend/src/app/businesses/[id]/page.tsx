@@ -18,6 +18,7 @@ import type {
   OutreachEmail,
   Screenshot,
   SecurityFinding,
+  TechnicalFinding,
 } from "@/lib/types";
 
 export default function BusinessDetailPage() {
@@ -30,6 +31,7 @@ export default function BusinessDetailPage() {
   const [lighthouse, setLighthouse] = useState<LighthouseReport | null>(null);
   const [accessibility, setAccessibility] = useState<AccessibilityFinding | null>(null);
   const [security, setSecurity] = useState<SecurityFinding | null>(null);
+  const [technical, setTechnical] = useState<TechnicalFinding | null>(null);
   const [screenshots, setScreenshots] = useState<Screenshot[]>([]);
   const [report, setReport] = useState<AIReport | null>(null);
   const [emails, setEmails] = useState<OutreachEmail[]>([]);
@@ -52,16 +54,18 @@ export default function BusinessDetailPage() {
   async function loadAuditDetails(auditJobId: string) {
     const job = await api.audits.get(auditJobId);
     setAuditJob(job);
-    const [lh, a11y, sec, shots, rep] = await Promise.all([
+    const [lh, a11y, sec, tech, shots, rep] = await Promise.all([
       api.audits.lighthouse(auditJobId).catch(() => null),
       api.audits.accessibility(auditJobId).catch(() => null),
       api.audits.security(auditJobId).catch(() => null),
+      api.audits.technical(auditJobId).catch(() => null),
       api.audits.screenshots(auditJobId).catch(() => []),
       api.audits.report(auditJobId).catch(() => null),
     ]);
     setLighthouse(lh);
     setAccessibility(a11y);
     setSecurity(sec);
+    setTechnical(tech);
     setScreenshots(shots);
     setReport(rep);
   }
@@ -118,7 +122,7 @@ export default function BusinessDetailPage() {
 
   return (
     <AppShell>
-      <div className="mb-6 flex items-start justify-between">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="font-display text-2xl font-semibold text-ink">{business.name}</h1>
           <p className="mt-1 text-sm text-ink-muted">
@@ -216,6 +220,42 @@ export default function BusinessDetailPage() {
         </div>
       )}
 
+      {technical && (
+        <div className="mb-6 card p-5">
+          <h2 className="mb-3 font-display text-sm font-semibold text-ink">
+            Technical & SEO — {technical.technical_score ?? "—"}/100
+          </h2>
+          {technical.page_load_time_ms !== null && (
+            <p className="mb-3 text-sm text-ink-muted">
+              Page loaded in <span className="font-mono text-ink">{(technical.page_load_time_ms / 1000).toFixed(1)}s</span>
+            </p>
+          )}
+          <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-3">
+            <FindingRow label="sitemap.xml present" ok={!!technical.sitemap_present} />
+            <FindingRow label="robots.txt present" ok={!!technical.robots_present} />
+            <FindingRow label="Favicon present" ok={!!technical.favicon_present} />
+            <FindingRow label="Schema markup" ok={!!technical.schema_markup_present} />
+            <FindingRow label="OpenGraph tags" ok={!!technical.open_graph_present} />
+            <FindingRow label="Twitter Card tags" ok={!!technical.twitter_card_present} />
+            <FindingRow label="No broken links" ok={!technical.broken_links_count} />
+            <FindingRow label="No oversized images" ok={!technical.oversized_images_count} />
+          </div>
+          {(technical.broken_links_count ?? 0) > 0 && (
+            <p className="mt-3 text-xs text-priority-critical">
+              {technical.broken_links_count} broken link{technical.broken_links_count === 1 ? "" : "s"} found
+            </p>
+          )}
+          {(technical.oversized_images_count ?? 0) > 0 && (
+            <p className="mt-1 text-xs text-priority-high">
+              {technical.oversized_images_count} uncompressed/oversized image{technical.oversized_images_count === 1 ? "" : "s"}
+            </p>
+          )}
+          {technical.google_business_link && (
+            <p className="mt-1 text-xs text-ink-muted">Links to Google Business profile ✓</p>
+          )}
+        </div>
+      )}
+
       {accessibility && (
         <div className="mb-6 card p-5">
           <h2 className="mb-3 font-display text-sm font-semibold text-ink">
@@ -244,7 +284,12 @@ export default function BusinessDetailPage() {
       <div className="card p-5">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="font-display text-sm font-semibold text-ink">Outreach emails</h2>
-          <button onClick={handleDraftEmail} className="btn-secondary text-xs" disabled={!report}>
+          <button
+            onClick={handleDraftEmail}
+            className="btn-secondary text-xs"
+            disabled={!report && !!business.website_url}
+            title={!report && business.website_url ? "Run an audit first to draft a grounded email" : undefined}
+          >
             <Mail size={14} />
             Draft new
           </button>

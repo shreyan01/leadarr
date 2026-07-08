@@ -12,6 +12,7 @@ from app.db.session import AsyncSessionLocal
 from app.repositories.business_repository import SqlAlchemyBusinessRepository
 from app.services.discovery.discovery_service import DiscoveryService
 from app.services.validation.validation_service import WebsiteValidationService
+from app.workers.async_utils import run_worker_task
 from app.workers.celery_app import celery_app  # noqa: F401  (ensures app is configured before task registration)
 
 logger = get_logger(__name__)
@@ -30,7 +31,7 @@ def run_discovery(
     """Celery entrypoint — runs the async discovery pipeline to completion
     inside a fresh event loop, since Celery workers are synchronous."""
     try:
-        return asyncio.run(_run_discovery_async(organization_id, country, city, category, limit))
+        return run_worker_task(_run_discovery_async(organization_id, country, city, category, limit))
     except Exception as exc:  # noqa: BLE001 — deliberately broad: this is the task boundary
         logger.error("discovery_task_failed", error=str(exc), city=city, category=category)
         raise self.retry(exc=exc) from exc

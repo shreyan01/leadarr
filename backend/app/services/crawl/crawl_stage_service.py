@@ -67,6 +67,7 @@ class CrawlStageService:
                 fonts={"items": result.fonts},
                 js_files={"items": result.js_files},
                 css_files={"items": result.css_files},
+                page_load_time_ms=result.page_load_time_ms,
                 crawled_at=result.crawled_at,
             )
             screenshots = [

@@ -3,7 +3,7 @@ from __future__ import annotations
 import enum
 import uuid
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Text
+from sqlalchemy import DateTime, Enum, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -40,6 +40,7 @@ class WebsiteSnapshot(Base, UUIDPrimaryKeyMixin):
     fonts: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     js_files: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     css_files: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    page_load_time_ms: Mapped[float | None] = mapped_column(Float, nullable=True)
     crawled_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     screenshots: Mapped[list["Screenshot"]] = relationship(back_populates="snapshot", cascade="all, delete-orphan")

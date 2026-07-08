@@ -89,3 +89,9 @@ class FakeBusinessRepository:
             return None
         business.status = status
         return business
+
+    async def delete(self, business_id: uuid.UUID) -> bool:
+        if business_id not in self.businesses:
+            return False
+        del self.businesses[business_id]
+        return True

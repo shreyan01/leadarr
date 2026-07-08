@@ -39,8 +39,10 @@ services:
   # precision (~16-18GB) — full precision won't fit on most single consumer
   # GPUs at all, let alone alongside anything else already using VRAM.
   # --gpu-memory-utilization is a fraction of TOTAL GPU memory (not free
-  # memory) that vLLM is allowed to reserve upfront; 0.4 leaves headroom for
-  # qwen-embed below plus whatever else is already running on the host GPU.
+  # memory) that vLLM is allowed to reserve upfront; 0.75 is generous since
+  # this host's GPU has substantial free headroom outside this stack — see
+  # docs/SELF_HOSTING.md if you need to tune this down for a smaller GPU or
+  # one shared with other applications.
   #
   # --enforce-eager skips vLLM's torch.compile/CUDA-graph capture step. That
   # step needs a large, unpredictable memory spike on top of steady-state
@@ -61,7 +63,7 @@ services:
       - --quantization=awq
       - --port=8001
       - --max-model-len=8192
-      - --gpu-memory-utilization=0.4
+      - --gpu-memory-utilization=0.75
       - --enforce-eager
       - --limit-mm-per-prompt
       - '{"image": 5, "video": 0}'

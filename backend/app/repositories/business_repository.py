@@ -32,6 +32,8 @@ class BusinessRepository(Protocol):
 
     async def update_status(self, business_id: uuid.UUID, status: BusinessStatus) -> Business | None: ...
 
+    async def delete(self, business_id: uuid.UUID) -> bool: ...
+
 
 class SqlAlchemyBusinessRepository:
     def __init__(self, session: AsyncSession) -> None:
@@ -113,3 +115,15 @@ class SqlAlchemyBusinessRepository:
         business.status = status
         await self._session.flush()
         return business
+
+    async def delete(self, business_id: uuid.UUID) -> bool:
+        business = await self.get_by_id(business_id)
+        if business is None:
+            return False
+        # Audit jobs, campaigns, and outreach emails all have
+        # ondelete="CASCADE" foreign keys back to businesses (see their
+        # models), so deleting the business row cleans up everything
+        # derived from it in one operation — no orphaned data left behind.
+        await self._session.delete(business)
+        await self._session.flush()
+        return True

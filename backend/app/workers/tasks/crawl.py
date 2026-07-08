@@ -14,6 +14,7 @@ from app.repositories.business_repository import SqlAlchemyBusinessRepository
 from app.services.crawl.crawl_stage_service import CrawlStageService
 from app.services.crawl.crawler_service import CrawlerService
 from app.utils.storage import get_storage_backend
+from app.workers.async_utils import run_worker_task
 from app.workers.celery_app import celery_app  # noqa: F401
 
 logger = get_logger(__name__)
@@ -22,7 +23,7 @@ logger = get_logger(__name__)
 @shared_task(name="app.workers.tasks.crawl.run_crawl", bind=True, max_retries=2, default_retry_delay=30)
 def run_crawl(self, audit_job_id: str, business_id: str) -> dict:
     try:
-        return asyncio.run(_run_crawl_async(audit_job_id, business_id))
+        return run_worker_task(_run_crawl_async(audit_job_id, business_id))
     except Exception as exc:  # noqa: BLE001
         logger.error("crawl_task_failed", audit_job_id=audit_job_id, error=str(exc))
         raise self.retry(exc=exc) from exc

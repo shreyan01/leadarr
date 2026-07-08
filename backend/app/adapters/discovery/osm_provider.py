@@ -17,6 +17,8 @@ real site), not a dead end to discard.
 """
 from __future__ import annotations
 
+import re
+
 import httpx
 
 from app.adapters.discovery.interfaces import DiscoveredBusiness
@@ -79,6 +81,15 @@ _CATEGORY_TAG_MAP: dict[str, list[tuple[str, str]]] = {
 _FALLBACK_TAG_KEYS = ["shop", "office", "craft", "amenity"]
 
 
+_NAME_NOISE_RE = re.compile(r"[^\w\s]")
+
+
+def _normalize_name(name: str) -> str:
+    """Lowercase, strip punctuation/extra whitespace so trivial formatting
+    differences ("H&B Tax Firm" vs "H & B Tax Firm") don't defeat dedup."""
+    return re.sub(r"\s+", " ", _NAME_NOISE_RE.sub(" ", name.lower())).strip()
+
+
 class OsmDiscoveryProvider:
     def __init__(self, timeout_s: float = 30.0) -> None:
         self._timeout_s = timeout_s
@@ -103,11 +114,39 @@ class OsmDiscoveryProvider:
             raise ProviderError(f"Overpass query failed: {type(exc).__name__}: {exc}") from exc
 
         results: list[DiscoveredBusiness] = []
-        for element in data.get("elements", [])[:limit]:
+        for element in data.get("elements", []):
             business = self._parse_element(element, category=category, city=city, country=country)
             if business is not None:
                 results.append(business)
-        return results
+
+        results = self._deduplicate(results)
+        return results[:limit]
+
+    @staticmethod
+    def _deduplicate(businesses: list[DiscoveredBusiness]) -> list[DiscoveredBusiness]:
+        """OSM frequently maps one real business as multiple elements — a
+        point AND a building outline, or duplicate community edits — each
+        with a distinct element ID, so ID-based dedup (what the repository
+        layer does) doesn't catch it. Groups by normalized name instead and
+        keeps the most complete record per group (preferring one with a
+        website, then other contact info, then whichever came first)."""
+        best_by_name: dict[str, DiscoveredBusiness] = {}
+
+        def completeness(b: DiscoveredBusiness) -> tuple:
+            return (
+                bool(b.website_url),
+                bool(b.phone or b.email),
+                bool(b.facebook_url or b.instagram_url),
+                bool(b.address),
+            )
+
+        for business in businesses:
+            key = _normalize_name(business.name)
+            existing = best_by_name.get(key)
+            if existing is None or completeness(business) > completeness(existing):
+                best_by_name[key] = business
+
+        return list(best_by_name.values())
 
     async def _geocode_bbox(self, *, city: str, country: str) -> tuple[float, float, float, float]:
         """Returns (south, north, west, east)."""
