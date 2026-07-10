@@ -211,6 +211,7 @@ export const api = {
       request<OutreachEmail>(`/emails/${emailId}`, { method: "PATCH", body: patch }),
     send: (emailId: string, toAddress: string) =>
       request<OutreachEmail>(`/emails/${emailId}/send`, { method: "POST", body: { to_address: toAddress } }),
+    delete: (emailId: string) => request<void>(`/emails/${emailId}`, { method: "DELETE" }),
   },
 
   campaigns: {

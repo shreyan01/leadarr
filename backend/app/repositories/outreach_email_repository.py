@@ -14,6 +14,7 @@ class OutreachEmailRepository(Protocol):
     async def get_by_id(self, email_id: uuid.UUID) -> OutreachEmail | None: ...
     async def list_by_business(self, business_id: uuid.UUID) -> list[OutreachEmail]: ...
     async def update(self, email: OutreachEmail) -> OutreachEmail: ...
+    async def delete(self, email_id: uuid.UUID) -> bool: ...
 
 
 class SqlAlchemyOutreachEmailRepository:
@@ -41,3 +42,11 @@ class SqlAlchemyOutreachEmailRepository:
     async def update(self, email: OutreachEmail) -> OutreachEmail:
         await self._session.flush()
         return email
+
+    async def delete(self, email_id: uuid.UUID) -> bool:
+        email = await self.get_by_id(email_id)
+        if email is None:
+            return False
+        await self._session.delete(email)
+        await self._session.flush()
+        return True

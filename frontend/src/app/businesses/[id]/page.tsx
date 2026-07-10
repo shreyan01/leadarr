@@ -4,10 +4,10 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { Mail, Play, ShieldCheck, ShieldAlert } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
+import { OutreachEmailCard } from "@/components/OutreachEmailCard";
 import { ScoreGauge } from "@/components/ScoreGauge";
 import { PriorityBadge } from "@/components/PriorityBadge";
 import { api, ApiError } from "@/lib/api";
-import { formatDateTime } from "@/lib/format";
 import type {
   AccessibilityFinding,
   AIReport,
@@ -299,14 +299,13 @@ export default function BusinessDetailPage() {
         ) : (
           <div className="space-y-3">
             {emails.map((email) => (
-              <div key={email.id} className="rounded-md border border-border-subtle p-3">
-                <div className="mb-1 flex items-center justify-between">
-                  <span className="text-sm font-medium text-ink">{email.subject}</span>
-                  <span className="text-xs uppercase text-ink-faint">{email.status}</span>
-                </div>
-                <p className="whitespace-pre-line text-sm text-ink-muted">{email.body_text}</p>
-                <p className="mt-2 text-xs text-ink-faint">{formatDateTime(email.created_at)}</p>
-              </div>
+              <OutreachEmailCard
+                key={email.id}
+                email={email}
+                defaultRecipient={business.email}
+                onUpdated={(updated) => setEmails((prev) => prev.map((e) => (e.id === updated.id ? updated : e)))}
+                onDeleted={(emailId) => setEmails((prev) => prev.filter((e) => e.id !== emailId))}
+              />
             ))}
           </div>
         )}

@@ -62,7 +62,7 @@ services:
       - --served-model-name=qwen2.5-vl-7b
       - --quantization=awq
       - --port=8001
-      - --max-model-len=8192
+      - --max-model-len=16384
       - --gpu-memory-utilization=0.75
       - --enforce-eager
       - --limit-mm-per-prompt
@@ -140,6 +140,13 @@ services:
       - backend_storage:/app/storage
     ports:
       - "8000:8000"
+    # Docker's default /dev/shm is only 64MB — too small for Chromium
+    # (used both by Playwright for crawling and by Lighthouse's own Chrome
+    # launch), which crashes immediately on startup without more shared
+    # memory. This is the standard, durable fix; --disable-dev-shm-usage on
+    # individual Chrome invocations (see lighthouse_cli.py) helps too, but
+    # this fixes it for every Chromium process in the container at once.
+    shm_size: "1gb"
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
   worker:
@@ -153,7 +160,13 @@ services:
     volumes:
       - ./backend:/app
       - backend_storage:/app/storage
-    command: celery -A app.workers.celery_app worker --loglevel=info -Q discovery,crawl,audit,reporting,outreach
+    # Explicit concurrency rather than Celery's default (CPU core count,
+    # uncapped) — each audit spins up its own Playwright Chromium plus
+    # Lighthouse's separate Chromium, so this bounds how many run at once
+    # rather than letting it scale with however many cores this machine has.
+    # 4 comfortably covers "3 audits at once" with a little headroom.
+    shm_size: "2gb"
+    command: celery -A app.workers.celery_app worker --loglevel=info -Q discovery,crawl,audit,reporting,outreach --concurrency=4
 
   frontend:
     build:

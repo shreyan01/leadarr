@@ -48,6 +48,38 @@ def extract_metadata(html: str, base_url: str) -> dict:
     }
 
 
+_EMAIL_TEXT_RE = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
+# Common false positives worth excluding — image/font/CSS references that
+# happen to look like an email (e.g. "2x@retina.png" style asset names)
+# and placeholder addresses that show up in templates.
+_EMAIL_EXCLUDE_DOMAINS = {"example.com", "sentry.io", "wixpress.com", "godaddy.com", "yourdomain.com"}
+
+
+def extract_contact_email(html: str) -> str | None:
+    """Real `mailto:` links are the reliable source — essentially zero
+    false positives, since a business only adds one deliberately. Falls
+    back to scanning visible text for a plain-written address (very common
+    on small-business "Contact Us" pages: "info@company.com" with no link
+    behind it at all) if no mailto: link is present."""
+    soup = BeautifulSoup(html, "html.parser")
+
+    for a in soup.find_all("a", href=True):
+        href = a["href"]
+        if href.lower().startswith("mailto:"):
+            address = href[len("mailto:"):].split("?")[0].strip()
+            if address and "@" in address:
+                return address
+
+    visible_text = soup.get_text(" ", strip=True)
+    for match in _EMAIL_TEXT_RE.finditer(visible_text):
+        candidate = match.group(0)
+        domain = candidate.rsplit("@", 1)[-1].lower()
+        if domain not in _EMAIL_EXCLUDE_DOMAINS:
+            return candidate
+
+    return None
+
+
 def extract_favicon(html: str, base_url: str) -> str | None:
     soup = BeautifulSoup(html, "html.parser")
     icon = soup.find("link", rel=re.compile(r"icon", re.I))

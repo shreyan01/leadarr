@@ -66,7 +66,7 @@ class EmailDraftStageService:
                 subject=parsed["subject"],
                 body_text=parsed["body_text"],
                 body_html=parsed["body_html"],
-                provider="anthropic",
+                provider=getattr(self._chat, "provider_name", "openai-compatible"),
                 model=result.model,
             )
             await self._emails.create(email)

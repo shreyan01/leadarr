@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import httpx
 from openai import AsyncOpenAI
 
 from app.ai.interfaces import ChatResult, Message
@@ -11,7 +12,8 @@ class OpenAIChatProvider:
     by passing a different ``base_url`` at construction time."""
 
     def __init__(self, api_key: str, base_url: str | None = None) -> None:
-        self._client = AsyncOpenAI(api_key=api_key, base_url=base_url)
+        self._http_client = httpx.AsyncClient()
+        self._client = AsyncOpenAI(api_key=api_key, base_url=base_url, http_client=self._http_client)
 
     async def complete(
         self, messages: list[Message], *, model: str, temperature: float = 0.3, max_tokens: int = 2000

@@ -179,3 +179,14 @@ async def send_email(
 ):
     org_id = uuid.UUID(token.org) if token.org else None
     return await send_service.send(email_id=email_id, to_address=payload.to_address, organization_id=org_id)
+
+
+@router.delete("/emails/{email_id}", status_code=204)
+async def delete_email(
+    email_id: uuid.UUID,
+    token: TokenPayload = Depends(require_role(Role.OWNER, Role.ADMIN, Role.ANALYST)),
+    email_repo: OutreachEmailRepository = Depends(get_outreach_email_repository),
+):
+    deleted = await email_repo.delete(email_id)
+    if not deleted:
+        raise NotFoundError("Outreach email not found.")

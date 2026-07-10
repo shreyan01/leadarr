@@ -130,7 +130,14 @@ class CrawlerService:
         )
 
     async def _capture(self, page, business_id: uuid.UUID, audit_job_id: uuid.UUID, device: str) -> ScreenshotArtifact:
-        png_bytes = await page.screenshot(full_page=(device == "desktop"))
+        # Viewport-only, not full-page: a full-page capture can be
+        # arbitrarily tall for a long homepage, which produces far more
+        # vision tokens than the model's context budget allows (vLLM
+        # rejects an oversized multimodal request with a 400). It's also
+        # the more correct choice for what we're actually scoring — trust,
+        # professionalism, and design first-impressions are naturally
+        # formed from what's visible without scrolling.
+        png_bytes = await page.screenshot(full_page=False)
         key = new_object_key(business_id=business_id, audit_job_id=audit_job_id, kind=f"screenshot_{device}", extension="png")
         path = await self._storage.save_bytes(key=key, content=png_bytes)
         viewport = _VIEWPORTS[device]
