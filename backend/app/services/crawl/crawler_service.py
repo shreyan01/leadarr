@@ -58,6 +58,7 @@ class CrawlResult:
     js_files: list[str]
     css_files: list[str]
     page_load_time_ms: float
+    contact_email: str | None
     screenshots: list[ScreenshotArtifact] = field(default_factory=list)
     crawled_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -126,6 +127,7 @@ class CrawlerService:
             js_files=html_parser.extract_js_files(html, final_url),
             css_files=html_parser.extract_css_files(html, final_url),
             page_load_time_ms=page_load_time_ms,
+            contact_email=html_parser.extract_contact_email(html),
             screenshots=screenshots,
         )
 

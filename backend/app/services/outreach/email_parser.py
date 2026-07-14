@@ -24,7 +24,6 @@ def parse_email_response(raw_text: str) -> dict:
 
     subject = str(data.get("subject") or "").strip()
     body_text = str(data.get("body_text") or "").strip()
-    body_html = data.get("body_html")
 
     if not subject or not body_text:
         raise ProviderError("Email draft response missing subject or body_text.")
@@ -33,11 +32,7 @@ def parse_email_response(raw_text: str) -> dict:
     if spam_hits:
         raise ProviderError(f"Email draft contains spam-like language: {', '.join(spam_hits)}")
 
-    return {
-        "subject": subject,
-        "body_text": body_text,
-        "body_html": str(body_html).strip() if body_html else None,
-    }
+    return {"subject": subject, "body_text": body_text}
 
 
 def detect_spam_language(text: str) -> list[str]:

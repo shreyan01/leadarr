@@ -27,12 +27,14 @@ class ReportStageService:
         report_repo: AIReportRepository,
         audit_job_repo: AuditJobRepository,
         model: str,
+        provider_name: str,
     ) -> None:
         self._chat = chat_provider
         self._storage = storage
         self._reports = report_repo
         self._audit_jobs = audit_job_repo
         self._model = model
+        self._provider_name = provider_name
 
     async def run(
         self,
@@ -77,7 +79,7 @@ class ReportStageService:
 
             report = AIReport(
                 audit_job_id=audit_job_id,
-                provider="anthropic",
+                provider=self._provider_name,
                 model=result.model,
                 executive_summary=parsed["executive_summary"],
                 technical_summary=parsed["technical_summary"],

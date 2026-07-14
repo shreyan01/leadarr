@@ -8,7 +8,7 @@ const body = Inter({ subsets: ["latin"], variable: "--font-body" });
 const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono" });
 
 export const metadata: Metadata = {
-  title: "LeadForge",
+  title: "Builderhut.club",
   description: "Automated website audits and lead scoring for agencies.",
 };
 

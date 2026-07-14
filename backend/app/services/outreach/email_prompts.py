@@ -25,8 +25,7 @@ class EmailInputs:
 
 _EMAIL_JSON_SHAPE = {
     "subject": "<= 70 characters, specific, no clickbait/spam phrasing",
-    "body_text": "plain-text email body, 120-200 words, professional tone, ends with a soft call to action",
-    "body_html": "the same content as body_text, wrapped in minimal semantic HTML (p tags, no inline styles, no tables)",
+    "body_text": "plain-text email body, 120-200 words, professional tone, paragraphs separated by a blank line, ends with a soft call to action",
 }
 
 

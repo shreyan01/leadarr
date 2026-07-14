@@ -76,6 +76,12 @@ class CrawlStageService:
             ]
             await self._snapshots.create(snapshot, screenshots)
 
+            if result.contact_email and not business.email:
+                # Found a real contact email right on the page we already
+                # crawled — persisted immediately rather than leaving it
+                # for manual entry every time an outreach email gets sent.
+                await self._businesses.update_email(business_id, result.contact_email)
+
             await self._audit_jobs.log_event(
                 audit_job_id=audit_job_id, stage=STAGE_NAME, status=JobEventStatus.SUCCEEDED,
                 duration_ms=elapsed_ms(),

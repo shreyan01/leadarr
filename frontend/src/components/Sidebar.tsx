@@ -42,11 +42,10 @@ export function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onCloseMobile
       >
         <div className="flex items-center justify-between px-4 py-5">
           <div className="flex items-center gap-2 overflow-hidden">
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-brass text-sm font-bold text-canvas">
-              L
-            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.png" alt="Builderhut.club" className="h-7 w-7 shrink-0 rounded-md object-cover" />
             {!collapsed && (
-              <span className="truncate font-display text-lg font-semibold tracking-tight">LeadForge</span>
+              <span className="truncate font-display text-lg font-semibold tracking-tight">Builderhut.club</span>
             )}
           </div>
           <button onClick={onCloseMobile} className="text-ink-muted hover:text-ink md:hidden" aria-label="Close menu">

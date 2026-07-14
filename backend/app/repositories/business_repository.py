@@ -32,6 +32,10 @@ class BusinessRepository(Protocol):
 
     async def update_status(self, business_id: uuid.UUID, status: BusinessStatus) -> Business | None: ...
 
+    async def update_email(self, business_id: uuid.UUID, email: str) -> Business | None: ...
+
+    async def update(self, business_id: uuid.UUID, data: dict) -> Business | None: ...
+
     async def delete(self, business_id: uuid.UUID) -> bool: ...
 
 
@@ -113,6 +117,23 @@ class SqlAlchemyBusinessRepository:
         if business is None:
             return None
         business.status = status
+        await self._session.flush()
+        return business
+
+    async def update_email(self, business_id: uuid.UUID, email: str) -> Business | None:
+        business = await self.get_by_id(business_id)
+        if business is None:
+            return None
+        business.email = email
+        await self._session.flush()
+        return business
+
+    async def update(self, business_id: uuid.UUID, data: dict) -> Business | None:
+        business = await self.get_by_id(business_id)
+        if business is None:
+            return None
+        for field, value in data.items():
+            setattr(business, field, value)
         await self._session.flush()
         return business
 

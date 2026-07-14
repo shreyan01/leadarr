@@ -47,7 +47,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           >
             <Menu size={20} />
           </button>
-          <span className="font-display text-base font-semibold">LeadForge</span>
+          <span className="font-display text-base font-semibold">Builderhut.club</span>
         </div>
         <main className="flex-1 overflow-y-auto bg-canvas px-4 py-6 sm:px-6 md:px-8 md:py-8">{children}</main>
       </div>

@@ -313,6 +313,7 @@ async def _run_reporting_async(previous_result: dict) -> dict:
             report_repo=SqlAlchemyAIReportRepository(session),
             audit_job_repo=audit_job_repo,
             model=settings.DEFAULT_CHAT_MODEL,
+            provider_name=settings.AI_CHAT_PROVIDER,
         )
         await service.run(
             audit_job_id=audit_job_id,
@@ -375,6 +376,7 @@ async def _run_outreach_draft_async(previous_result: dict) -> dict:
             campaign_repo=SqlAlchemyCampaignRepository(session),
             audit_job_repo=audit_job_repo,
             model=settings.DEFAULT_CHAT_MODEL,
+            provider_name=settings.AI_CHAT_PROVIDER,
         )
         await service.run(
             audit_job_id=audit_job_id,

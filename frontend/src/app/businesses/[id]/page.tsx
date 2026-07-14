@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { Mail, Play, ShieldCheck, ShieldAlert } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
+import { ContactChannels } from "@/components/ContactChannels";
 import { OutreachEmailCard } from "@/components/OutreachEmailCard";
 import { ScoreGauge } from "@/components/ScoreGauge";
 import { PriorityBadge } from "@/components/PriorityBadge";
@@ -133,6 +134,7 @@ export default function BusinessDetailPage() {
               {business.website_url}
             </a>
           )}
+          <ContactChannels business={business} draftMessage={emails[0]?.body_text} />
         </div>
         <div className="flex items-center gap-3">
           {leadScore && (

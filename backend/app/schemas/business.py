@@ -55,3 +55,19 @@ class BusinessListResponse(BaseModel):
     total: int
     page: int
     page_size: int
+
+
+class BusinessUpdate(BaseModel):
+    """All fields optional — only what's provided gets changed. The main
+    use case: adding a website_url you found yourself to a business that
+    was discovered without one (common for OSM discoveries, which often
+    lack that field even for businesses that do have a real site)."""
+
+    name: str | None = None
+    category: str | None = None
+    phone: str | None = None
+    email: str | None = None
+    address: str | None = None
+    city: str | None = None
+    country: str | None = None
+    website_url: str | None = None

@@ -28,6 +28,7 @@ from app.schemas.email import EmailDraftRequest, EmailSendRequest, EmailUpdateRe
 from app.services.outreach.email_parser import parse_email_response
 from app.services.outreach.email_prompts import EmailInputs, build_email_prompt
 from app.services.outreach.email_send_service import EmailSendService
+from app.services.outreach.email_template_renderer import render_branded_email_html
 
 router = APIRouter(tags=["outreach"])
 
@@ -128,8 +129,10 @@ async def draft_email(
             template_key=payload.template_key,
             subject=parsed["subject"],
             body_text=parsed["body_text"],
-            body_html=parsed["body_html"],
-            provider="anthropic",
+            body_html=render_branded_email_html(
+                subject=parsed["subject"], body_text=parsed["body_text"], sender_name=settings.APP_NAME
+            ),
+            provider=settings.AI_CHAT_PROVIDER,
             model=result.model,
         )
     )
@@ -157,6 +160,7 @@ async def update_email(
     payload: EmailUpdateRequest,
     token: TokenPayload = Depends(require_role(Role.OWNER, Role.ADMIN, Role.ANALYST)),
     email_repo: OutreachEmailRepository = Depends(get_outreach_email_repository),
+    settings: Settings = Depends(get_settings),
 ):
     email = await email_repo.get_by_id(email_id)
     if email is None:
@@ -167,6 +171,12 @@ async def update_email(
         email.body_text = payload.body_text
     if payload.body_html is not None:
         email.body_html = payload.body_html
+    elif payload.subject is not None or payload.body_text is not None:
+        # Re-render from the (possibly just-edited) plain text rather than
+        # leave the HTML version stale relative to what was actually edited.
+        email.body_html = render_branded_email_html(
+            subject=email.subject, body_text=email.body_text, sender_name=settings.APP_NAME
+        )
     return await email_repo.update(email)
 
 

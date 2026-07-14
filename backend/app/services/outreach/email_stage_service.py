@@ -12,6 +12,7 @@ from app.repositories.campaign_repository import CampaignRepository
 from app.repositories.outreach_email_repository import OutreachEmailRepository
 from app.services.outreach.email_parser import parse_email_response
 from app.services.outreach.email_prompts import EmailInputs, build_email_prompt
+from app.services.outreach.email_template_renderer import render_branded_email_html
 from app.utils.stage_timer import stage_timer
 
 logger = get_logger(__name__)
@@ -27,12 +28,14 @@ class EmailDraftStageService:
         campaign_repo: CampaignRepository,
         audit_job_repo: AuditJobRepository,
         model: str,
+        provider_name: str,
     ) -> None:
         self._chat = chat_provider
         self._emails = email_repo
         self._campaigns = campaign_repo
         self._audit_jobs = audit_job_repo
         self._model = model
+        self._provider_name = provider_name
 
     async def run(
         self,
@@ -65,8 +68,12 @@ class EmailDraftStageService:
                 template_key=report_inputs.template_key,
                 subject=parsed["subject"],
                 body_text=parsed["body_text"],
-                body_html=parsed["body_html"],
-                provider=getattr(self._chat, "provider_name", "openai-compatible"),
+                body_html=render_branded_email_html(
+                    subject=parsed["subject"],
+                    body_text=parsed["body_text"],
+                    sender_name=report_inputs.sender_agency_name,
+                ),
+                provider=self._provider_name,
                 model=result.model,
             )
             await self._emails.create(email)

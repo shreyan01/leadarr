@@ -10,7 +10,8 @@ from app.core.exceptions import NotFoundError
 from app.core.security import Role, TokenPayload, get_current_token, require_role
 from app.models.business import BusinessStatus
 from app.repositories.business_repository import BusinessRepository
-from app.schemas.business import BusinessListResponse, BusinessOut
+from app.schemas.business import BusinessListResponse, BusinessOut, BusinessUpdate
+from app.services.validation.validation_service import WebsiteValidationService
 
 router = APIRouter(prefix="/businesses", tags=["businesses"])
 
@@ -53,6 +54,40 @@ async def get_business(
     business = await repo.get_by_id(business_id)
     if business is None:
         raise NotFoundError("Business not found.")
+    return business
+
+
+@router.patch("/{business_id}", response_model=BusinessOut)
+async def update_business(
+    business_id: uuid.UUID,
+    payload: BusinessUpdate,
+    token: TokenPayload = Depends(require_role(Role.OWNER, Role.ADMIN, Role.ANALYST)),
+    repo: BusinessRepository = Depends(get_business_repository),
+):
+    """General edit — the main use case is adding a website_url you found
+    yourself to a business that was discovered without one (common for OSM
+    discoveries). If a website_url is newly added where none existed
+    before, it's validated immediately (same check discovery itself runs)
+    so the business becomes auditable right away rather than staying stuck
+    in "discovered" status until the next audit attempt fails."""
+    existing = await repo.get_by_id(business_id)
+    if existing is None:
+        raise NotFoundError("Business not found.")
+
+    data = payload.model_dump(exclude_unset=True)
+    had_no_website_before = not existing.website_url
+
+    business = await repo.update(business_id, data)
+
+    if had_no_website_before and business and business.website_url:
+        validator = WebsiteValidationService()
+        result = await validator.validate(business.website_url)
+        if result.is_valid:
+            update_fields: dict = {"status": BusinessStatus.VALIDATED}
+            if result.final_url:
+                update_fields["website_url"] = result.final_url
+            business = await repo.update(business_id, update_fields)
+
     return business
 
 

@@ -29,10 +29,9 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-canvas px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex items-center justify-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-brass text-sm font-bold text-canvas">
-            L
-          </div>
-          <span className="font-display text-xl font-semibold">LeadForge</span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.png" alt="Builderhut.club" className="h-8 w-8 rounded-md object-cover" />
+          <span className="font-display text-xl font-semibold">Builderhut.club</span>
         </div>
 
         <form onSubmit={handleSubmit} className="card space-y-4 p-6">
