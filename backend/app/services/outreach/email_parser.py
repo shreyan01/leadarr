@@ -15,7 +15,13 @@ _SPAM_PHRASES = ("act now", "limited time", "risk free", "100% guaranteed", "cli
 def parse_email_response(raw_text: str) -> dict:
     cleaned = _FENCE_RE.sub("", raw_text.strip())
     try:
-        data = json.loads(cleaned)
+        # strict=False tolerates raw control characters (a literal newline
+        # instead of an escaped \n) inside JSON string values — smaller
+        # local models occasionally do this even when the content itself
+        # is otherwise perfectly valid; Python's default strict mode
+        # rejects it as a technicality that has nothing to do with whether
+        # the draft itself is usable.
+        data = json.loads(cleaned, strict=False)
     except json.JSONDecodeError as exc:
         raise ProviderError(f"Email draft response was not valid JSON: {exc}") from exc
 

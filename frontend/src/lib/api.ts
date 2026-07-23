@@ -161,6 +161,19 @@ export const api = {
       address?: string;
     }) => request<Business>("/businesses", { method: "POST", body: data }),
     archive: (id: string) => request<Business>(`/businesses/${id}/archive`, { method: "PATCH" }),
+    update: (
+      id: string,
+      patch: Partial<{
+        name: string;
+        category: string;
+        phone: string;
+        email: string;
+        address: string;
+        city: string;
+        country: string;
+        website_url: string;
+      }>,
+    ) => request<Business>(`/businesses/${id}`, { method: "PATCH", body: patch }),
     delete: (id: string) => request<void>(`/businesses/${id}`, { method: "DELETE" }),
   },
 

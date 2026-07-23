@@ -25,7 +25,10 @@ _REQUIRED_KEYS = (
 def parse_report_response(raw_text: str) -> dict:
     cleaned = _FENCE_RE.sub("", raw_text.strip())
     try:
-        data = json.loads(cleaned)
+        # strict=False tolerates raw control characters (a literal newline
+        # instead of an escaped \n) inside JSON string values — see the
+        # matching comment in email_parser.py for why this is needed.
+        data = json.loads(cleaned, strict=False)
     except json.JSONDecodeError as exc:
         raise ProviderError(f"AI report response was not valid JSON: {exc}") from exc
 

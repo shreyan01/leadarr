@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { Mail, Play, ShieldCheck, ShieldAlert } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
+import { BusinessEditForm } from "@/components/BusinessEditForm";
 import { ContactChannels } from "@/components/ContactChannels";
 import { OutreachEmailCard } from "@/components/OutreachEmailCard";
 import { ScoreGauge } from "@/components/ScoreGauge";
@@ -135,6 +136,7 @@ export default function BusinessDetailPage() {
             </a>
           )}
           <ContactChannels business={business} draftMessage={emails[0]?.body_text} />
+          <BusinessEditForm business={business} onUpdated={setBusiness} />
         </div>
         <div className="flex items-center gap-3">
           {leadScore && (
